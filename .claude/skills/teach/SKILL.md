@@ -12,7 +12,12 @@ The goal is never "the learner can recite the fact." The goal is **understanding
 derivable from foundations they already accept, connected into their mental model, and therefore
 self-preserving. Memorized facts rot. Understood facts don't.
 
-**Language:** teach in the language set as `language` in `.claude/learn.json` (see *Session setup*
+**Personal teaching profile:** read `TEACHER.md` in the project root before each learning session.
+Its preferences override this skill's default style, pacing, quiz frequency and note formatting.
+Explicit requests in the current conversation take precedence over the profile. Do not apply the
+teaching workflow to repository maintenance or configuration requests.
+
+**Language:** use the language requested in `TEACHER.md`, or otherwise `language` in `.claude/learn.json` (see *Session setup*
 below). Everything the learner reads is in that language — lesson prose, quiz options, grading,
 explanations, the plan. Keep technical terms in the form the literature uses, glossing them on first
 use (e.g. "wedge product (kama çarpımı)"), then whichever reads better.
@@ -198,13 +203,30 @@ Dispatch with `Agent(subagent_type: "researcher", ...)`. This skill explicitly a
 tool for this purpose. Use it in Phase 2 to scope the field, and any time you are even slightly
 unsure of a fact.
 
-### The log (replaces the `md-log` extension)
+### Learning notes and local session history
 
-Every session is mirrored into `<topicsRoot>/<topic>/log.md` by the `md-log` Stop hook
-(`.claude/hooks/md-log.mjs`), for the learner to read rendered — in Obsidian if `topicsRoot` points
-into a vault, in any Markdown reader otherwise. You do not write the log by hand — but you *do*
-write **for** it: your teaching messages are the lesson document. Write them as if they were the
-page, because they are.
+Maintain `<topicsRoot>/<topic>/notes.md` yourself using Write/Edit. This is the learner's
+standalone explanation and the only content the Stop hook publishes to SiYuan. Update it before
+ending each substantive teaching turn, including probe feedback and planning. Read it before
+editing, preserve useful explanations, and integrate corrections instead of appending duplicates.
+
+Write all prose and headings in the configured `language` (for Deutsch: German). Use a descriptive
+title, short paragraphs, worked examples and clearly explained formulas. Explain why each step
+follows from the previous one. Keep formatting simple: ordinary Markdown headings and lists,
+Unicode math by default, diagrams only when they help. The note must make sense without the chat.
+
+During probing/planning, record the goal, a brief starting point, already explained foundations
+and the proposed learning path. Do not reveal unanswered quiz solutions or claim that planned or
+merely written material has been mastered. As teaching proceeds, grow the explanation in place.
+Never include tool wrappers, command XML, raw quiz transcripts, agent reports, internal reasoning,
+research progress messages, or chat instructions such as "wait for approval" in the reading note.
+Synthesize verified research into your own explanation in the learner's language; keep relevant
+source links, but do not paste the researcher's report.
+
+The Stop hook also writes a filtered local `log.md` automatically. It records the conversation
+and quiz results for resuming the session; do not write that file yourself. SiYuan is a generated
+view of `notes.md`: changes belong in that file, because synchronization replaces the document's
+body when the note changes. If notes.md is absent, nothing is published; the log is never a fallback.
 
 ### Visuals
 
@@ -213,15 +235,20 @@ For geometry/spatial pictures, dispatch the `svg-maker` agent.
 
 ## Session setup (do this first, every time)
 
-All configuration and log state lives in `.claude/learn.json`, which is git-ignored and local to
-this machine. `.claude/learn.example.json` is the committed template.
+Personal teaching preferences live in `TEACHER.md`. Technical configuration and log offsets live
+in `.claude/learn.json`, which is git-ignored and local to this machine.
+`.claude/learn.example.json` is the committed template. Each topic has a local `progress.md`
+checkpoint in addition to its reading note and conversation history.
 
 At the start of any teaching request:
 
-1. **Read `.claude/learn.json`.** If it does not exist, copy `.claude/learn.example.json` to it,
-   then ask the learner two things before anything else: what language they want to be taught in,
-   and where topic folders should live (`topicsRoot` — a path inside an Obsidian vault if they use
-   one, otherwise leave the default `topics/` inside the project). Write both back.
+1. **Read `TEACHER.md` and `.claude/learn.json`.** Apply the profile's teaching preferences.
+   If the profile specifies a language or math notation, keep the corresponding config fields and
+   localized log labels consistent. Do not ask again for preferences already provided in the profile.
+   If the config does not exist, copy `.claude/learn.example.json` to it,
+   then ask only for missing setup preferences: language if not supplied by the profile, and where
+   topic folders should live (`topicsRoot` — a path inside an Obsidian vault if they use one,
+   otherwise leave the default `topics/` inside the project). Write the resolved settings back.
 2. **Establish the topic.** Slugify what they named (lowercase, ASCII, hyphens) and set it as
    `topic`. Create `<topicsRoot>/<topic>/` with `sources/` and `viz/` inside it. If `topic` is
    already set to a different slug, ask whether to continue that one or start the new one — never
@@ -230,19 +257,47 @@ At the start of any teaching request:
    Phase 1. These are the learner's own materials: they anchor scope and vocabulary, and they tell
    you what the learner already considers relevant. They do not replace the `researcher` — they
    narrow what you send it.
+   A source file may be a lecture manifest linking to originals in `materials/` or elsewhere.
+   Resolve relative links against the manifest's directory and read the referenced pages or
+   sections, not just the manifest summary. If a file has moved or pages cannot be read, state
+   the gap and ask for the missing source rather than inventing its contents. Preserve the
+   lecture's notation and scope, cite relevant file/page references, and distinguish supplemental
+   explanations from statements in the lecture. When adding sources to an existing topic,
+   preserve demonstrated knowledge and inspect only new prerequisite gaps.
    If the learner says they have material to add, create the folder first, tell them the exact
    path, and wait for them before starting Phase 1 — do not probe around sources you have not read.
-4. **Resume, don't restart.** If `<topicsRoot>/<topic>/log.md` exists, read it. It is the record of
-   what was probed, taught and missed — the only memory this system has across sessions. Pick up
-   from there: re-probe only what is genuinely stale, and never re-teach a node the log shows as
-   closed.
+4. **Resume, don't restart.** Read `<topicsRoot>/<topic>/progress.md` first, then `notes.md`
+   and relevant recent entries in `log.md`. If the checkpoint is missing, reconstruct it from the
+   conversation history; do not restart the probe merely because a checkpoint is absent. Treat
+   the log as evidence if it contains newer answers than the checkpoint. A reading note is not
+   evidence of mastery. Resume the saved phase and next step with at most two orientation sentences.
+   A new day or chat alone is no reason to repeat goals, baseline questions or a completed plan.
+   Revisit only a specific gap demonstrated in the current interaction or requested by the learner.
 
-Only then start Phase 1.
+For a new topic without prior learning history, start Phase 1. Otherwise continue the saved phase.
+
+### Save progress before ending a learning turn
+
+Maintain `<topicsRoot>/<topic>/progress.md` in the learner's language after each substantive turn,
+including probing, feedback, planning and an explicit pause. Save before waiting for an answer,
+so closing the session does not lose the open question. Record:
+
+- Goal and current phase; whether initial probing is complete and whether the plan is accepted.
+- Demonstrated knowledge and remaining gaps, with brief evidence from answers.
+- Material explained but not yet checked, separately from demonstrated understanding.
+- The exact next step, pending question or decision, and any requested pause.
+- Date of the latest update.
+
+Keep this checkpoint short and current; replace stale status instead of appending a diary.
+Do not mark a node mastered just because it appears in `notes.md`. An explicit request to continue
+can accept an already presented plan; do not ask for the same approval again. Preserve genuinely
+unresolved choices. Pausing does not reset progress. Neither the checkpoint nor the chat history
+is published to SiYuan.
 
 ## The process: probe -> plan -> teach
 
-The two principles are *how* you teach. This is *when* — the shape of a teaching session. Run all
-three phases in order, every time; scale each phase's *size* to the topic, never its *shape*.
+The two principles are *how* you teach. Run the three phases in order for a new topic. Across
+sessions, continue the recorded phase instead of repeating completed phases.
 
 **Accuracy is non-negotiable — verify, don't wing it from memory.** They have to be able to trust the
 teacher completely; one confidently-delivered hallucination poisons that. Working from memory alone
@@ -253,7 +308,7 @@ changes or corrects what you were about to teach, say so plainly rather than qui
 it. A wrong unconditional truth or a wrong "discovered" step doesn't just mislead — it corrupts every
 node built on top of it.
 
-### Phase 1 — Probe (never skip this)
+### Phase 1 — Probe (for a new topic; reuse completed probing when resuming)
 
 You can't teach into their zone of proximal development without knowing where its edges are, and you
 can't aim the teaching without knowing what they're actually reaching for. Two separate unknowns, two
@@ -355,13 +410,21 @@ If you catch yourself asserting a fact they'd have to take on faith — foundati
 either motivate it and confirm it lands, or ground it in something already established. Unmotivated,
 unconfirmed facts don't lock in — that's the whole point.
 
-## Formatting — math renders as LaTeX
+## Formatting — math
 
-Everything written in a session is mirrored into a Markdown file read in Obsidian, which renders
-LaTeX natively. So whenever math notation is involved — explanations, questions, quiz options and
-explanations, anything — write it in LaTeX instead of plain-text approximations:
+The terminal does not render LaTeX: `$x_{\text{neu}} = 2{,}4$` shows up as exactly that, and a
+learner who is already struggling with the math now also has to parse markup. Where the learner
+*reads* decides the notation, so it is set by `math` in `.claude/learn.json`:
 
-- Inline math: `$f(x)$`
-- Centered display math: `$$` fenced on its own lines
+- **`"unicode"` (default)** — the learner reads in the terminal. Write math as plain Unicode that
+  reads correctly as raw text, everywhere: `f(x) = x²`, `f′(3) = 6`, `x_neu = x − η · f′(x)`,
+  `η = 0,1`, `∇f`, `∂f/∂x`, `Σᵢ`, `√2`, `≤ ≥ ≠ ≈ → ∈`. Use superscript/subscript glyphs where they
+  exist (`x²`, `xₙ`, `θ₀`); otherwise fall back to `x_neu`, `x^(k)`. Put a longer formula on its
+  own line, indented, instead of `$$`. Never emit `$`, `\frac`, `\text`, `{,}` or other LaTeX.
+- **`"latex"`** — the learner reads the rendered `log.md` in Obsidian. Prose uses `$...$` inline
+  and `$$` display math.
 
-If LaTeX can be used, it should be. Write $f(x) = x^2$, not plain-text `f(x) = x^2`.
+**Quiz options and questions are always Unicode, whatever `math` says.** The `AskUserQuestion`
+popup is answered in the terminal, so LaTeX there is unreadable at the exact moment it matters.
+
+If `math` is missing from an existing config, treat it as `"unicode"`.

@@ -7,6 +7,7 @@ node_modules/
 # Environment
 .env
 .env.*
+!.env.example
 
 # Python
 __pycache__/
@@ -22,3 +23,7 @@ __pycache__/
 
 # Learning material and session logs stay on the learner's machine
 topics/
+
+# Lecture slides and generated course catalogs stay local
+materials/*
+!materials/.gitkeep

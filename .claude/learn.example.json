@@ -1,5 +1,6 @@
 {
   "language": "English",
+  "math": "unicode",
   "topicsRoot": "topics",
   "topic": null,
   "labels": {
@@ -7,5 +8,8 @@
     "question": "Question",
     "answer": "My answer"
   },
-  "sessions": {}
+  "sessions": {},
+  "siyuan": {
+    "notebook": "Learning"
+  }
 }
